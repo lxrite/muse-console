@@ -108,17 +108,17 @@ jobs:
             echo "make_latest=true" >> $GITHUB_OUTPUT
           fi
           
-          cat <<EOF > release_notes.md
-### Build Information
-- **Ref / Branch**: \`${{ github.ref_name }}\` (\`${COMMIT_SHA}\`)
-- **Commit Message**: ${COMMIT_MSG}
-- **Build Time**: ${BUILD_TIME} UTC
-
-### Checksums (SHA256)
-\`\`\`
-$(cat release-assets/checksums.txt)
-\`\`\`
-EOF
+          {
+            echo "### Build Information"
+            echo "- **Ref / Branch**: \`${{ github.ref_name }}\` (\`${COMMIT_SHA}\`)"
+            echo "- **Commit Message**: ${COMMIT_MSG}"
+            echo "- **Build Time**: ${BUILD_TIME} UTC"
+            echo ""
+            echo "### Checksums (SHA256)"
+            echo '```'
+            cat release-assets/checksums.txt
+            echo '```'
+          } > release_notes.md
 
       - name: Publish to GitHub Release
         uses: softprops/action-gh-release@v2
