@@ -1,0 +1,134 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Binary (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+
+      - name: Compile binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          BUILD_TIME=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          VERSION="${{ github.ref_name }}"
+          if [ "${{ github.ref_type }}" != "tag" ]; then
+            VERSION="master-${COMMIT_SHA}"
+          fi
+
+          LDFLAGS="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT_SHA} -X main.buildDate=${BUILD_TIME}"
+
+          mkdir -p dist
+          go build -trimpath -ldflags "${LDFLAGS}" -o dist/muse-console .
+
+      - name: Package archive
+        run: |
+          ARCHIVE_NAME="muse-console-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz"
+          cd dist
+          cp ../config.example.toml . 2>/dev/null || true
+          cp ../LICENSE . 2>/dev/null || true
+          cp ../README_zh.md . 2>/dev/null || true
+          tar -czvf "../${ARCHIVE_NAME}" *
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: muse-console-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz
+
+  release:
+    name: Publish Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Generate Checksums
+        run: |
+          cd release-assets
+          sha256sum muse-console-*.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Prepare Release Notes
+        id: release_info
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=%B | head -n 1)
+          BUILD_TIME=$(date -u '+%Y-%m-%d %H:%M:%S')
+          
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "release_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "make_latest=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=latest" >> $GITHUB_OUTPUT
+            echo "release_name=Latest Build (${COMMIT_SHA})" >> $GITHUB_OUTPUT
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "make_latest=true" >> $GITHUB_OUTPUT
+          fi
+          
+          cat <<EOF > release_notes.md
+### Build Information
+- **Ref / Branch**: \`${{ github.ref_name }}\` (\`${COMMIT_SHA}\`)
+- **Commit Message**: ${COMMIT_MSG}
+- **Build Time**: ${BUILD_TIME} UTC
+
+### Checksums (SHA256)
+\`\`\`
+$(cat release-assets/checksums.txt)
+\`\`\`
+EOF
+
+      - name: Publish to GitHub Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.release_info.outputs.tag_name }}
+          name: ${{ steps.release_info.outputs.release_name }}
+          prerelease: ${{ steps.release_info.outputs.is_prerelease == 'true' }}
+          draft: false
+          make_latest: ${{ steps.release_info.outputs.make_latest }}
+          body_path: release_notes.md
+          files: release-assets/*

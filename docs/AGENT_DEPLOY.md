@@ -59,8 +59,16 @@ Because Muse sandbox VMs have no public IP, internet exposure strictly depends o
 
 ## 4. Get the software
 
-**Option A — prebuilt binary (recommended once released):**  
-download the release for `linux-amd64` (or target architecture) from `https://github.com/lxrite/muse-console/releases` into `/home/hatch/...`, then `chmod +x muse-console`. One file, no installer.
+**Option A — prebuilt binary (recommended):**  
+```bash
+mkdir -p /home/hatch/workspace/muse-console && cd /home/hatch/workspace/muse-console
+ARCH=$(uname -m)
+[ "$ARCH" = "x86_64" ] && ARCH="amd64"
+[ "$ARCH" = "aarch64" ] && ARCH="arm64"
+curl -fsSL -o muse-console.tar.gz "https://github.com/lxrite/muse-console/releases/download/latest/muse-console-linux-${ARCH}.tar.gz"
+tar -xzf muse-console.tar.gz
+chmod +x muse-console
+```
 
 **Option B — build from source:**  
 ```bash

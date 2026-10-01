@@ -13,22 +13,36 @@ package main
 import (
 	"embed"
 	"flag"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
 	"path/filepath"
 )
 
+var (
+	version   = "dev"
+	commit    = "none"
+	buildDate = "unknown"
+)
+
 //go:embed static templates
 var contentFS embed.FS
 
 func main() {
+	showVersion := flag.Bool("v", false, "print version and exit")
+	flag.BoolVar(showVersion, "version", false, "print version and exit")
 	configPath := flag.String("config", "config.toml", "TOML config file")
 	flag.String("addr", "", "listen address (overrides config)")
 	flag.String("data-dir", "", "directory holding timeline.jsonl (overrides config)")
 	flag.String("disk-path", "", "path whose filesystem disk stats are shown (overrides config)")
 	flag.String("files-root", "", "root directory for the file browser (overrides config)")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("muse-console %s (commit: %s, built: %s)\n", version, commit, buildDate)
+		return
+	}
 
 	setFlags := map[string]*string{}
 	flag.Visit(func(f *flag.Flag) {
