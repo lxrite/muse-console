@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="{{htmlLang .Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>Muse Console</title>
+<style>
+/* Times are rendered in UTC by the server; the script at the end of <body>
+   rewrites every [data-ts] in the viewer's local timezone synchronously
+   before first paint. Hidden until then so UTC text never flashes. */
+[data-ts]{visibility:hidden}
+</style>
+<noscript><style>[data-ts]{visibility:visible}</style></noscript>
+<style>
+*{box-sizing:border-box}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+max-width:1120px;margin:0 auto;padding:28px 20px 40px;color:#111827;
+background:linear-gradient(180deg,#f1f5ff 0%,#f8fafc 220px,#f8fafc 100%);
+min-height:100vh}
+header.top{display:flex;align-items:center;justify-content:space-between;
+flex-wrap:wrap;gap:12px;margin-bottom:6px}
+h1{font-size:22px;margin:0;display:flex;align-items:center;gap:10px}
+h1 .logo{font-size:26px}
+h2{font-size:17px;margin:30px 0 12px;display:flex;align-items:center;gap:8px}
+h2::before{content:"";display:inline-block;width:4px;height:16px;border-radius:2px;background:#2563eb}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.nav a{display:inline-block;padding:8px 16px;border:1px solid #e5e7eb;border-radius:10px;
+text-decoration:none;color:#374151;background:#fff;font-size:14px;font-weight:500;
+box-shadow:0 1px 2px rgba(0,0,0,.04);transition:all .15s}
+.nav a:hover{background:#eef2ff;border-color:#c7d2fe;color:#1d4ed8;transform:translateY(-1px)}
+.cli-icon{display:inline-flex;vertical-align:-3px;margin-right:1px}
+.cli-icon svg{display:block}
+.cards{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+.card{flex:1;min-width:150px;border:1px solid #e5e7eb;border-radius:14px;
+padding:16px 18px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.04);
+transition:transform .15s,box-shadow .15s}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(37,99,235,.10)}
+.card h3{margin:0 0 8px;font-size:13px;color:#6b7280;font-weight:600}
+.card p{margin:0;font-size:24px;font-weight:700;letter-spacing:-.5px}
+.card small{color:#9ca3af;font-weight:400;font-size:13px}
+.panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;
+padding:18px;box-shadow:0 2px 8px rgba(0,0,0,.04);margin-bottom:8px}
+.legend{display:flex;gap:18px;margin:2px 0 12px;font-size:14px;flex-wrap:wrap;align-items:center}
+.dot{display:inline-block;width:12px;height:12px;border-radius:4px;margin-right:6px;vertical-align:-1px}
+.summary{margin:14px 0 4px;font-size:14px}
+.stat{margin-right:14px;white-space:nowrap}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid #f3f4f6}
+th{color:#6b7280;font-weight:600;font-size:13px;background:#f9fafb}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f8fafc}
+.empty{color:#9ca3af;font-size:14px;padding:8px 0}
+.foot{margin-top:30px;color:#9ca3af;font-size:12px;text-align:center}
+.foot-time{margin-top:6px;color:#cbd0d8;font-size:12px;text-align:center}
+.badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.badge.red{background:#fef2f2;color:#b91c1c}
+</style>
+</head>
+<body>
+<header class="top">
+<h1><span class="logo">🖥️</span> Muse Console</h1>
+<div class="nav">
+<a href="/term"><span class="cli-icon"><svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1" width="14" height="14" rx="3.5" fill="#111827"/><path d="M4.5 5.2 7.3 8l-2.8 2.8" stroke="#f9fafb" stroke-width="1.7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11.2h3.5" stroke="#f9fafb" stroke-width="1.7" stroke-linecap="round"/></svg></span> {{t .Lang "nav.terminal"}}</a>
+<a href="/files">📁 {{t .Lang "nav.files"}}</a>
+<a href="/change-password">🔑 {{t .Lang "nav.changepw"}}</a>
+<a href="/logout">🚪 {{t .Lang "nav.logout"}}</a>
+</div>
+</header>
+<div class="cards">
+<div class="card"><h3>{{t .Lang "status.cpu"}}</h3><p>{{printf "%.1f" .CPU}}%</p></div>
+<div class="card"><h3>{{t .Lang "status.mem"}}</h3><p>{{.MemUsed}} <small>/ {{.MemTotal}} MB</small></p></div>
+<div class="card"><h3>{{t .Lang "status.mempct"}}</h3><p>{{printf "%.1f" .MemPct}}%</p></div>
+<div class="card"><h3>{{t .Lang "status.disk"}} {{.DiskPath}}</h3><p>{{printf "%.1f" .DiskUsed}} <small>/ {{printf "%.1f" .DiskTotal}} GB</small></p></div>
+<div class="card"><h3>{{t .Lang "status.diskfree"}}</h3><p>{{printf "%.1f" .DiskFree}} <small>GB ({{printf "%.1f" .DiskPct}}% {{t .Lang "status.used"}})</small></p></div>
+</div>
+<h2>{{t .Lang "status.timeline"}}</h2>
+<div class="panel">
+<div class="legend">
+<span><span class="dot" style="background:#22c55e"></span>{{t .Lang "state.active"}}</span>
+<span><span class="dot" style="background:#ef4444"></span>{{t .Lang "state.offline"}}</span>
+<span><span class="dot" style="background:#d1d5db"></span>{{t .Lang "state.unknown"}}</span>
+<span style="color:#9ca3af;font-size:13px">{{t .Lang "status.legend_hint"}}</span>
+</div>
+{{.SVG}}
+<p class="summary">{{range .Summary}}<span class="stat"><span class="dot" style="background:{{.Color}}"></span>{{.Name}}：{{.Text}}</span>{{end}}</p>
+</div>
+<h2>{{t .Lang "status.events"}}</h2>
+<div class="panel">
+{{if .Events}}
+<table><tr><th>{{t .Lang "status.ev_start"}}</th><th>{{t .Lang "status.ev_kind"}}</th><th>{{t .Lang "status.ev_end"}}</th><th>{{t .Lang "status.ev_dur"}}</th></tr>
+{{range .Events}}<tr><td><span data-ts="{{.Start}}">{{utcShort .Start}} UTC</span></td><td><span class="badge red">{{.Kind}}</span></td><td><span data-ts="{{.End}}">{{utcShort .End}} UTC</span></td><td>{{.Dur}}</td></tr>
+{{end}}</table>
+{{else}}
+<p class="empty">{{t .Lang "status.no_events"}}</p>
+{{end}}
+</div>
+<p class="foot">{{t .Lang "status.footer"}}</p>
+<p class="foot-time">{{t .Lang "status.now"}}<span data-ts="{{.Now}}">{{utcFull .Now}} UTC</span></p>
+<script>
+(function(){
+  function pad(n){return (n<10?"0":"")+n;}
+  function fmtFull(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "
+    +pad(d.getHours())+":"+pad(d.getMinutes())+":"+pad(d.getSeconds());}
+  function fmtShort(d){return pad(d.getMonth()+1)+"-"+pad(d.getDate())+" "
+    +pad(d.getHours())+":"+pad(d.getMinutes());}
+  function fmtDur(sec){
+    sec=Math.max(0,Math.round(sec));
+    var h=Math.floor(sec/3600), m=Math.floor(sec%3600/60);
+    if(isZh){
+      if(h>0) return h+"小时"+m+"分";
+      if(m>0) return m+"分";
+      return sec+"秒";
+    }
+    if(h>0) return h+"h "+m+"m";
+    if(m>0) return m+"m";
+    return sec+"s";
+  }
+  function show(el){el.style.visibility="visible";}
+  var isZh=(document.documentElement.lang||"en").toLowerCase().indexOf("zh")===0;
+  try{
+    // 1. Plain timestamps -> viewer-local time.
+    // (.tick labels are removed in step 3; tspan uses the short format.)
+    document.querySelectorAll("[data-ts]:not(.tick)").forEach(function(el){
+      var d=new Date(parseInt(el.getAttribute("data-ts"),10)*1000);
+      el.textContent=fmtFull(d);
+      show(el);
+    });
+    // 2. Timeline segment tooltips -> viewer-local time.
+    document.querySelectorAll("rect[data-start]").forEach(function(el){
+      var s=new Date(parseInt(el.getAttribute("data-start"),10)*1000);
+      var e=new Date(parseInt(el.getAttribute("data-end"),10)*1000);
+      var t=el.querySelector("title");
+      if(t) t.textContent=isZh
+        ? el.getAttribute("data-state")+"："+fmtShort(s)+" → "+fmtShort(e)+"（"+fmtDur(parseInt(el.getAttribute("data-dur"),10))+"）"
+        : el.getAttribute("data-state")+": "+fmtShort(s)+" → "+fmtShort(e)+" ("+fmtDur(parseInt(el.getAttribute("data-dur"),10))+")";
+    });
+    // 3. Re-render axis ticks aligned to the viewer's local 00/06/12/18h.
+    var svg=document.querySelector("svg[data-start]");
+    if(svg){
+      var start=parseInt(svg.getAttribute("data-start"),10)*1000;
+      var now=parseInt(svg.getAttribute("data-now"),10)*1000;
+      var width=1440;
+      svg.querySelectorAll(".tick").forEach(function(el){el.remove();});
+      var NS="http://www.w3.org/2000/svg";
+      var t=new Date(start); t.setMinutes(0,0,0);
+      t.setHours(Math.floor(t.getHours()/6)*6,0,0,0);
+      if(t.getTime()<start) t=new Date(t.getTime()+6*3600*1000);
+      for(;t.getTime()<=now;t=new Date(t.getTime()+6*3600*1000)){
+        var x=(t.getTime()-start)/(now-start)*width;
+        var line=document.createElementNS(NS,"line");
+        line.setAttribute("x1",x.toFixed(1)); line.setAttribute("y1",26);
+        line.setAttribute("x2",x.toFixed(1)); line.setAttribute("y2",66);
+        line.setAttribute("stroke","#9ca3af");
+        var text=document.createElementNS(NS,"text");
+        text.setAttribute("x",x.toFixed(1)); text.setAttribute("y",82);
+        text.setAttribute("font-size",12); text.setAttribute("text-anchor","middle");
+        text.setAttribute("fill","#6b7280");
+        text.textContent=fmtShort(t);
+        svg.appendChild(line); svg.appendChild(text);
+      }
+    }
+  }catch(err){
+    // If anything fails, fall back to the server-rendered UTC text.
+    document.querySelectorAll("[data-ts]").forEach(show);
+  }
+})();
+</script>
+</body>
+</html>

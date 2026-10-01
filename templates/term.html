@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="{{htmlLang .Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t .Lang "term.title"}} · Muse Console</title>
+<link rel="stylesheet" href="/static/xterm.css">
+<style>
+  html,body{height:100%;margin:0;background:#1e1e1e;}
+  #topbar{height:40px;display:flex;align-items:center;gap:16px;padding:0 12px;
+          background:#111;color:#ccc;font:13px -apple-system,"PingFang SC",sans-serif;}
+  #topbar a{color:#93c5fd;text-decoration:none;}
+  #topbar a:hover{text-decoration:underline;}
+  #terminal{height:calc(100% - 40px);padding:8px;box-sizing:border-box;}
+  #status{position:fixed;top:48px;right:12px;color:#888;font:12px monospace;
+          background:rgba(0,0,0,.5);padding:4px 8px;border-radius:4px;z-index:10;}
+</style>
+</head>
+<body>
+<div id="topbar"><a href="/">← {{t .Lang "nav.home"}}</a><span>{{t .Lang "term.header"}}</span></div>
+<div id="status">connecting…</div>
+<div id="terminal"></div>
+<script src="/static/xterm.js"></script>
+<script src="/static/addon-fit.js"></script>
+<script>
+(function(){
+  const status = document.getElementById('status');
+
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    theme: { background: '#1e1e1e' },
+    scrollback: 5000,
+  });
+  const fit = new FitAddon.FitAddon();
+  term.loadAddon(fit);
+  term.open(document.getElementById('terminal'));
+  fit.fit();
+
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(wsProto + '//' + location.host + '/ws' + location.search);
+  ws.binaryType = 'arraybuffer';
+
+  const enc = d => btoa(unescape(encodeURIComponent(d)));
+  const dec = d => decodeURIComponent(escape(atob(d)));
+
+  ws.onopen = () => {
+    status.textContent = 'connected';
+    status.style.color = '#4ade80';
+    sendResize();
+    term.focus();
+  };
+  ws.onmessage = ev => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch(e) { return; }
+    if (msg.t === 'out' && msg.d) term.write(dec(msg.d));
+  };
+  ws.onclose = () => {
+    status.textContent = 'disconnected — reload to reconnect';
+    status.style.color = '#f87171';
+    term.write('\r\n\x1b[31m[connection closed]\x1b[0m\r\n');
+  };
+  ws.onerror = () => { status.textContent = 'connection error'; status.style.color = '#f87171'; };
+
+  term.onData(d => {
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({t:'in', d: enc(d)}));
+  });
+
+  function sendResize(){
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({t:'resize', cols: term.cols, rows: term.rows}));
+  }
+  let rzT;
+  window.addEventListener('resize', () => {
+    clearTimeout(rzT);
+    rzT = setTimeout(() => { fit.fit(); sendResize(); }, 100);
+  });
+})();
+</script>
+</body>
+</html>

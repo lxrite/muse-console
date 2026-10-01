@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="{{htmlLang .Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t .Lang "files.title"}} · Muse Console</title>
+<style>
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+max-width:1120px;margin:0 auto;padding:24px 20px 40px;color:#111827;
+background:linear-gradient(180deg,#f1f5ff 0%,#f8fafc 200px,#f8fafc 100%);min-height:100vh}
+.topbar{display:flex;align-items:center;gap:16px;margin-bottom:16px;font-size:14px}
+.topbar a{display:inline-block;padding:7px 14px;border:1px solid #e5e7eb;border-radius:10px;
+background:#fff;color:#374151;text-decoration:none;font-weight:500;font-size:13px;
+box-shadow:0 1px 2px rgba(0,0,0,.04);transition:all .15s}
+.topbar a:hover{background:#eef2ff;border-color:#c7d2fe;color:#1d4ed8}
+h1{font-size:20px;margin:0}
+#crumb{margin:14px 0;font-size:14px;word-break:break-all;background:#fff;border:1px solid #e5e7eb;
+border-radius:10px;padding:10px 14px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+#crumb a{color:#2563eb;text-decoration:none;font-weight:500}
+#crumb a:hover{text-decoration:underline}
+.toolbar{display:flex;gap:8px;margin:14px 0;flex-wrap:wrap}
+button{padding:8px 16px;border:1px solid #d1d5db;border-radius:10px;background:#fff;
+cursor:pointer;font-size:14px;font-weight:500;color:#374151;box-shadow:0 1px 2px rgba(0,0,0,.04);
+transition:all .15s}
+button:hover{background:#eef2ff;border-color:#c7d2fe;color:#1d4ed8}
+button.danger:hover{background:#fef2f2;border-color:#fca5a5;color:#b91c1c}
+.panel{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:6px 18px;
+box-shadow:0 2px 8px rgba(0,0,0,.04)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid #f3f4f6;padding:10px 12px;text-align:left}
+th{color:#6b7280;font-weight:600;font-size:13px}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#f8fafc}
+.name{cursor:pointer;color:#111827}
+.name.dir{color:#2563eb;font-weight:600}
+.act{white-space:nowrap}
+.act button{padding:5px 12px;font-size:13px;margin-right:6px;border-radius:8px}
+#modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:20}
+#modalBox{background:#fff;margin:5vh auto;max-width:900px;width:92%;border-radius:10px;
+padding:18px;max-height:85vh;overflow:auto}
+#modalBox pre{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;
+padding:12px;white-space:pre-wrap;word-break:break-all;font-size:13px}
+#modalImg{display:none;max-width:100%;border-radius:8px;border:1px solid #e5e7eb}
+#toast{display:none;position:fixed;left:50%;bottom:32px;transform:translateX(-50%);
+background:#1f2937;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;
+z-index:50;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:90vw}
+#err{color:#dc2626;font-size:14px;min-height:20px;margin:8px 0}
+.muted{color:#9ca3af;font-size:13px}
+</style>
+</head>
+<body>
+<div class="topbar">
+<a href="/">← {{t .Lang "nav.home"}}</a>
+<h1>📁 {{t .Lang "files.title"}}</h1>
+</div>
+<div id="crumb"></div>
+<div class="toolbar">
+<button id="btnUp">⬆️ {{t .Lang "files.upload"}}</button>
+<input type="file" id="fileInput" multiple style="display:none">
+<button id="btnMkdir">📁 {{t .Lang "files.mkdir"}}</button>
+<button id="btnRefresh">🔄 {{t .Lang "files.refresh"}}</button>
+</div>
+<div id="err"></div>
+<div class="panel">
+<table>
+<thead><tr><th>{{t .Lang "files.th_name"}}</th><th>{{t .Lang "files.th_size"}}</th><th>{{t .Lang "files.th_mtime"}}</th><th>{{t .Lang "files.th_act"}}</th></tr></thead>
+<tbody id="list"></tbody>
+</table>
+</div>
+<p class="muted">{{t .Lang "files.jail_note"}}</p>
+
+<div id="modal"><div id="modalBox">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+<strong id="modalTitle"></strong><button id="modalClose">{{t .Lang "files.close"}}</button>
+</div>
+<pre id="modalPre"></pre>
+<img id="modalImg" alt="{{t .Lang "files.preview"}}">
+</div></div>
+<div id="toast"></div>
+
+<script>
+window.I18N = {{i18nJSON .Lang}};
+</script>
+<script>
+(function(){
+  const T = window.I18N;
+  let cur = '';
+
+  const $ = id => document.getElementById(id);
+  const errBox = $('err');
+  const showErr = m => { errBox.textContent = m; };
+  const clearErr = () => { errBox.textContent = ''; };
+  let toastTimer = null;
+  const toast = m => {
+    const t = $('toast');
+    t.textContent = m;
+    t.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2500);
+  };
+  const fmtSize = n => n < 1024 ? n + ' B' : n < 1048576 ? (n/1024).toFixed(1) + ' KB'
+    : n < 1073741824 ? (n/1048576).toFixed(1) + ' MB' : (n/1073741824).toFixed(2) + ' GB';
+  const fmtTime = ts => new Date(ts * 1000).toLocaleString(document.documentElement.lang || 'en', {hour12: false});
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  async function api(url, opts) {
+    const r = await fetch(url, opts);
+    if (!r.ok) {
+      let msg = r.status;
+      try { msg = (await r.json()).error || r.status; } catch(e) {}
+      throw new Error(msg);
+    }
+    return r;
+  }
+
+  function crumb(path) {
+    const parts = path ? path.split('/') : [];
+    let h = '<a href="#" data-p="">🏠 ' + T['files.root'] + '</a>';
+    let acc = '';
+    parts.forEach(p => {
+      acc += (acc ? '/' : '') + p;
+      h += ' / <a href="#" data-p="' + esc(acc) + '">' + esc(p) + '</a>';
+    });
+    $('crumb').innerHTML = h;
+    $('crumb').querySelectorAll('a').forEach(a =>
+      a.addEventListener('click', e => { e.preventDefault(); load(a.dataset.p); }));
+  }
+
+  async function load(path) {
+    clearErr();
+    try {
+      const r = await api('/api/files/list?path=' + encodeURIComponent(path));
+      const d = await r.json();
+      cur = d.path === '.' ? '' : d.path;
+      crumb(cur);
+      const tb = $('list');
+      tb.innerHTML = '';
+      if (!d.entries.length) tb.innerHTML = '<tr><td colspan="4" class="muted">' + T['files.empty'] + '</td></tr>';
+      d.entries.forEach(e => {
+        const tr = document.createElement('tr');
+        const size = e.dir ? '—' : fmtSize(e.size);
+        tr.innerHTML =
+          '<td><span class="name' + (e.dir ? ' dir' : '') + '">' + (e.dir ? '📁 ' : '📄 ') + esc(e.name) + '</span></td>' +
+          '<td>' + size + '</td><td>' + fmtTime(e.mod) + '</td><td class="act"></td>';
+        tr.querySelector('.name').addEventListener('click', () => {
+          if (e.dir) load(e.path);
+          else viewFile(e);
+        });
+        const act = tr.querySelector('.act');
+        if (!e.dir) {
+          act.appendChild(mkBtn(T['files.download'], () => {
+            window.location = '/api/files/download?path=' + encodeURIComponent(e.path);
+          }));
+          act.appendChild(mkBtn(T['files.preview'], () => viewFile(e)));
+        }
+        act.appendChild(mkBtn(T['files.rename'], () => doRename(e)));
+        const del = mkBtn(T['files.delete'], () => doDelete(e));
+        del.classList.add('danger');
+        act.appendChild(del);
+        tb.appendChild(tr);
+      });
+    } catch(e) { showErr(T['files.load_fail'] + e.message); return false; }
+    return true;
+  }
+
+  function mkBtn(label, fn) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.addEventListener('click', ev => { ev.stopPropagation(); fn(); });
+    return b;
+  }
+
+  // Preview strategy (by extension):
+  // - Images: real preview (rendered via <img>)
+  // - PDF / archives / executables / media / fonts and other binaries: unsupported, toast message
+  // - Others: read as text; backend rejects with 400 on NUL bytes, frontend displays toast
+  const IMG_EXTS = new Set(['png','jpg','jpeg','gif','webp','avif','bmp','svg','ico']);
+  const NOPREVIEW_EXTS = new Set(['pdf',
+    'zip','tar','gz','tgz','bz2','xz','7z','rar',
+    'exe','dll','so','dylib','bin','dat','db','sqlite','sqlite3',
+    'mp4','mkv','avi','mov','webm','mp3','wav','flac','ogg','oga','opus',
+    'ttf','otf','woff','woff2','eot']);
+  const extOf = name => {
+    const i = name.lastIndexOf('.');
+    return i > 0 ? name.slice(i + 1).toLowerCase() : '';
+  };
+
+  function openModal(title) {
+    $('modalTitle').textContent = title;
+    $('modal').style.display = 'block';
+  }
+
+  async function viewFile(e) {
+    clearErr();
+    const ext = extOf(e.name);
+    if (IMG_EXTS.has(ext)) {
+      const img = $('modalImg');
+      img.style.display = 'none';
+      $('modalPre').style.display = 'none';
+      openModal(e.name);
+      img.onload = () => { img.style.display = 'block'; };
+      img.onerror = () => { $('modal').style.display = 'none'; toast(T['files.img_fail']); };
+      img.src = '/api/files/download?path=' + encodeURIComponent(e.path);
+      return;
+    }
+    if (NOPREVIEW_EXTS.has(ext)) {
+      toast(T['files.nopreview']);
+      return;
+    }
+    try {
+      const r = await api('/api/files/view?path=' + encodeURIComponent(e.path));
+      const d = await r.json();
+      $('modalImg').style.display = 'none';
+      $('modalPre').style.display = '';
+      $('modalPre').textContent = d.content;
+      openModal(e.name + (d.truncated ? T['files.truncated'] : ''));
+    } catch(e2) { toast(T['files.nopreview']); }
+  }
+  $('modalClose').addEventListener('click', () => $('modal').style.display = 'none');
+  $('modal').addEventListener('click', e => { if (e.target.id === 'modal') $('modal').style.display = 'none'; });
+
+  async function doRename(e) {
+    const name = prompt(T['files.rename_to'], e.name);
+    if (!name || name === e.name) return;
+    const dir = e.path.includes('/') ? e.path.slice(0, e.path.lastIndexOf('/')) : '';
+    const to = dir ? dir + '/' + name : name;
+    clearErr();
+    try {
+      await api('/api/files/rename', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({from: e.path, to})});
+      load(cur);
+    } catch(e2) { showErr(T['files.rename_fail'] + e2.message); }
+  }
+
+  async function doDelete(e) {
+    if (!confirm(T['files.del_confirm'].replace('%s', e.name) + (e.dir ? T['files.del_confirmd'] : ''))) return;
+    clearErr();
+    try {
+      await api('/api/files/delete', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: e.path})});
+      load(cur);
+    } catch(e2) { showErr(T['files.delete_fail'] + e2.message); }
+  }
+
+  $('btnRefresh').addEventListener('click', () => load(cur));
+  $('btnMkdir').addEventListener('click', async () => {
+    const name = prompt(T['files.mkdir_name']);
+    if (!name) return;
+    clearErr();
+    try {
+      await api('/api/files/mkdir', {method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({path: cur ? cur + '/' + name : name})});
+      load(cur);
+    } catch(e) { showErr(T['files.mkdir_fail'] + e.message); }
+  });
+  $('btnUp').addEventListener('click', () => $('fileInput').click());
+  $('fileInput').addEventListener('change', async ev => {
+    const files = ev.target.files;
+    if (!files.length) return;
+    const fd = new FormData();
+    for (const f of files) fd.append('files', f);
+    clearErr();
+    try {
+      const r = await api('/api/files/upload?path=' + encodeURIComponent(cur),
+        {method: 'POST', body: fd});
+      const d = await r.json();
+      load(cur);
+      if (d.saved && d.saved.length < files.length) showErr(T['files.up_partial']);
+    } catch(e) { showErr(T['files.up_fail'] + e.message); }
+    ev.target.value = '';
+  });
+
+  // Default landing directory is home/hatch (jail root "/" is reachable
+  // via the breadcrumb's root link; fall back to root if missing.
+  load('home/hatch').then(ok => { if (!ok) load(''); });
+})();
+</script>
+</body>
+</html>

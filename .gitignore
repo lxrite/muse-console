@@ -1,0 +1,12 @@
+# build output
+muse-console
+*.exe
+
+# credentials & local config
+config.toml
+.env
+
+# runtime data & temp
+timeline.jsonl
+*.log
+*.tmp

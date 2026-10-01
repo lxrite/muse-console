@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="{{htmlLang .Lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{t .Lang "login.title"}} · Muse Console</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 60%, #f8fafc 100%);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111827;
+    padding: 16px;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 40px 36px 32px;
+    width: 360px;
+    max-width: 100%;
+    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.10), 0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+  .logo { font-size: 34px; text-align: center; margin-bottom: 10px; }
+  h1 { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 6px; }
+  p.sub { color: #6b7280; font-size: 13px; text-align: center; margin-bottom: 28px; }
+  label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+  input {
+    width: 100%;
+    background: #f9fafb;
+    border: 1px solid #d1d5db;
+    color: #111827;
+    border-radius: 10px;
+    padding: 11px 13px;
+    font-size: 15px;
+    margin-bottom: 16px;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+  }
+  input:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+  button {
+    width: 100%;
+    background: #2563eb;
+    border: none;
+    color: #fff;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background .15s, transform .05s;
+  }
+  button:hover { background: #1d4ed8; }
+  button:active { transform: scale(0.99); }
+  .err {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .ok {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .foot { text-align: center; margin-top: 20px; font-size: 12px; color: #9ca3af; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">🖥️</div>
+    <h1>Muse Console</h1>
+    <p class="sub">{{t .Lang "login.sub"}}</p>
+    {{if .Error}}<div class="err">{{.Error}}</div>{{end}}
+    {{if .Changed}}<div class="ok">{{t .Lang "login.changed"}}</div>{{end}}
+    <form method="post" action="/login">
+      <input type="hidden" name="next" value="{{.Next}}">
+      <label for="username">{{t .Lang "login.username"}}</label>
+      <input id="username" name="username" autocomplete="username" autofocus required>
+      <label for="password">{{t .Lang "login.password"}}</label>
+      <input id="password" type="password" name="password" autocomplete="current-password" required>
+      <button type="submit">{{t .Lang "login.submit"}}</button>
+    </form>
+    <div class="foot">{{t .Lang "login.secure"}}</div>
+  </div>
+</body>
+</html>

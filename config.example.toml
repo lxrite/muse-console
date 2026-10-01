@@ -1,0 +1,21 @@
+# muse-console example configuration.
+# Copy to config.toml and adjust. Keep config.toml chmod 600 —
+# it holds plaintext passwords.
+
+addr = "127.0.0.1:8080"
+data_dir = "."
+disk_path = "/home/hatch"        # filesystem usage shown on the dashboard
+files_root = "/"                # file browser root (jailed to this tree)
+
+# Client-IP detection for login rate limiting (anti-brute-force:
+# 10 failures per 10 minutes from one IP -> 30 minute block).
+# By default the direct TCP peer is used. Behind a rathole tunnel that is
+# the tunnel endpoint, so the limit is effectively global.
+# Only uncomment these behind a TRUSTED reverse proxy that sets them —
+# otherwise anyone can spoof the header and bypass the limit.
+# Disabled by default.
+# trusted_proxy_headers = ["X-Forwarded-For", "X-Real-IP"]
+
+[[users]]
+username = "admin"
+password = "change-me"   # agent setups: use a random 6-digit temp password
